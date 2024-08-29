@@ -1,0 +1,64 @@
+/* General Styles */
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #121212;
+    color: #FFFFFF;
+    font-family: 'Courier New', Courier, monospace; /* Updated to a monospace font */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+}
+
+/* Container Styles */
+.container {
+    width: 80%;
+    margin-top: 2%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Textarea Styles */
+.textarea {
+    width: 100%;
+    height: 300px;
+    background-color: #1e1e1e;
+    color: #FFFFFF;
+    border: 2px solid #333;
+    border-radius: 5px;
+    padding: 15px;
+    box-sizing: border-box;
+    font-size: 16px; /* Ensures consistent font size */
+    font-family: inherit; /* Inherits font from body */
+    resize: none;
+    margin-bottom: 20px;
+    line-height: 1.5;
+    overflow-y: auto;
+}
+
+/* Button Styles */
+.button {
+    width: 150px;
+    padding: 10px 20px;
+    margin: 10px;
+    background-color: #333;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s ease;
+}
+
+.button:hover {
+    background-color: #555;
+}
+
+/* Copy Confirmation Pulse */
+#outputArea.pulse {
+    border-color: #00ff00;
+    box-shadow: 0 0 10px #00ff00;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
