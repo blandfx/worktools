@@ -4,114 +4,119 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Worktools</title>
+    <link rel="stylesheet" href="styles.css">
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: #121212;
-            color: #FFFFFF;
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-start;
-            align-items: center;
-            height: 100vh;
+        .field-selection {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr); /* Create four equal columns */
+            gap: 10px; /* Space between items */
+            margin-bottom: 10px;
         }
-
-        #inputArea {
-            width: 80%;
-            height: 40%;
-            margin-top: 5%;
-            background-color: #1e1e1e;
-            border: 2px solid #333;
-            padding: 10px;
-            box-sizing: border-box;
-        }
-
-        #outputArea {
-            width: 80%;
-            height: 40%;
-            margin-top: 5%;
-            background-color: #1e1e1e;
-            border: 2px solid #333;
-            padding: 10px;
-            box-sizing: border-box;
-            overflow-y: auto;
-        }
-
-        textarea {
-            width: 100%;
-            height: 100%;
-            background-color: #1e1e1e;
-            color: #FFFFFF;
-            border: none;
-            outline: none;
-            font-size: 1.5em;
-            resize: none;
-        }
-
-        #processButton {
-            margin-top: 10px;
-            padding: 10px 20px;
-            background-color: #333;
-            color: #FFFFFF;
-            border: none;
-            cursor: pointer;
-            font-size: 1em;
+        .field-selection label {
+            display: block;
+            white-space: nowrap;
         }
     </style>
 </head>
 <body>
 
-    <div id="inputArea">
-        <textarea id="textInput" placeholder="Enter XML data here..."></textarea>
-    </div>
+    <div class="container">
+        <textarea id="inputArea" class="textarea" placeholder="Enter XML data here..."></textarea>
 
-    <button id="processButton">Process XML</button>
+        <div id="fieldSelection" class="field-selection"></div>
 
-    <div id="outputArea">
-        <textarea id="outputBox" readonly></textarea>
+        <div>
+            <button id="processButton" class="button">Process XML</button>
+            <button id="copyButton" class="button">Copy Output</button>
+        </div>
+
+        <textarea id="outputArea" class="textarea" placeholder="Processed output will appear here..." readonly></textarea>
     </div>
 
     <script>
         document.getElementById('processButton').addEventListener('click', function() {
-            const xmlString = document.getElementById('textInput').value;
+            const xmlString = document.getElementById('inputArea').value;
             const parser = new DOMParser();
             const xmlDoc = parser.parseFromString(xmlString, "text/xml");
 
+            const fields = {
+                AAR_ID: getTextContent('AAR_ID'),
+                OwningFacility: getTextContent('OwningFacility'),
+                Order: getTextContent('Order'),
+                AutoRouteLimit: getTextContent('AutoRouteLimit'),
+                LowerAltitude: getTextContent('LowerAltitude'),
+                UpperAltitude: getTextContent('UpperAltitude'),
+                ProtectedAreaOverwrite: getTextContent('ProtectedAreaOverwrite'),
+                AARAutoRouteAlphas: getMultipleTextContent('AARAutoRouteAlphas', 'RouteString'),
+                AARTransitionFix: getMultipleTextContent('AARTransitionFix', 'FixName'),
+                ApplicableARTCCs: getMultipleTextContent('ApplicableARTCCs', 'ARTCC_ID'),
+                AARAirportList: getMultipleTextContent('AARAirportList', 'AirportID'),
+                AARACClassCriteriaList: getMultipleTextContent('AARACClassCriteriaList', 'AircraftClassCriteriaID'),
+                AARCrossingLine: getMultipleTextContent('AARCrossingLine', 'CrossingLineID'),
+                RouteFixList: getMultipleTextContent('RouteFixList', 'FixName')
+            };
+
+            const fieldSelectionDiv = document.getElementById('fieldSelection');
+            fieldSelectionDiv.innerHTML = ''; // Clear previous radio buttons
+
+            Object.keys(fields).forEach(fieldName => {
+                const fieldLabel = document.createElement('label');
+                fieldLabel.textContent = fieldName;
+
+                const checkBox = document.createElement('input');
+                checkBox.type = 'checkbox';
+                checkBox.name = 'fieldSelection';
+                checkBox.value = fieldName;
+                checkBox.checked = true; // Default to selected
+
+                fieldLabel.prepend(checkBox);
+                fieldSelectionDiv.appendChild(fieldLabel);
+            });
+
             function getTextContent(tagName) {
                 const element = xmlDoc.getElementsByTagName(tagName)[0];
-                return element ? element.textContent : '';
+                return element ? element.textContent.trim() : '';
             }
 
-            function getMultipleTextContent(tagName) {
-                const elements = xmlDoc.getElementsByTagName(tagName);
+            function getMultipleTextContent(parentTag, childTag) {
+                const parent = xmlDoc.getElementsByTagName(parentTag)[0];
+                if (!parent) return '';
+                const elements = parent.getElementsByTagName(childTag);
                 let contentArray = [];
                 for (let i = 0; i < elements.length; i++) {
-                    contentArray.push(elements[i].textContent);
+                    contentArray.push(elements[i].textContent.trim());
                 }
                 return contentArray.join(',');
             }
 
-            const AAR_ID = getTextContent('AAR_ID');
-            const OwningFacility = getTextContent('OwningFacility');
-            const Order = getTextContent('Order');
-            const AutoRouteLimit = getTextContent('AutoRouteLimit');
-            const LowerAltitude = getTextContent('LowerAltitude');
-            const UpperAltitude = getTextContent('UpperAltitude');
-            const ProtectedAreaOverwrite = getTextContent('ProtectedAreaOverwrite');
-            const AARAutoRouteAlphas = getMultipleTextContent('RouteString');
-            const AARTransitionFix = getMultipleTextContent('AARTransitionFix FixName');
-            const ApplicableARTCCs = getMultipleTextContent('ARTCC_ID');
-            const AARAirportList = getMultipleTextContent('AARAirportList AirportID');
-            const AARACClassCriteriaList = getMultipleTextContent('AARACClassCriteriaList AircraftClassCriteriaID');
-            const AARCrossingLine = getMultipleTextContent('AARCrossingLine CrossingLineID');
-            const RouteFixList = getMultipleTextContent('RouteFix FixName');
+            document.getElementById('fieldSelection').addEventListener('change', function() {
+                const selectedFields = Array.from(document.querySelectorAll('input[name="fieldSelection"]:checked')).map(input => input.value);
 
-            const output = 
-                `${AAR_ID}    ${OwningFacility}    -    -    -    ${Order}    ${AutoRouteLimit}    ${LowerAltitude}    ${UpperAltitude}    ${ProtectedAreaOverwrite}    ${AARAutoRouteAlphas}    ${AARTransitionFix}    ${ApplicableARTCCs}    ${AARAirportList}    ${AARACClassCriteriaList}    ${AARCrossingLine}    ${RouteFixList}`;
+                const output = selectedFields.map(fieldName => fields[fieldName]).join('\t');
+                document.getElementById('outputArea').value = output.trim();
+            });
 
-            document.getElementById('outputBox').value = output.trim();
+            // Trigger initial selection change to populate the output area
+            document.getElementById('fieldSelection').dispatchEvent(new Event('change'));
+        });
+
+        document.getElementById('copyButton').addEventListener('click', function() {
+            const outputArea = document.getElementById('outputArea');
+            outputArea.select();
+            outputArea.setSelectionRange(0, 99999); // For mobile devices
+
+            // Copy the text inside the textarea
+            navigator.clipboard.writeText(outputArea.value)
+                .then(() => {
+                    // Add the pulse effect to indicate the copy was successful
+                    outputArea.classList.add('pulse');
+                    setTimeout(() => {
+                        outputArea.classList.remove('pulse');
+                    }, 500); // Pulse effect duration
+                })
+                .catch(() => {
+                    console.error("Failed to copy the text.");
+                });
         });
     </script>
 
