@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Airway Route Extractor</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles for a sleeker dark theme and better form elements */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .form-input, .form-textarea {
+            background-color: #1f2937; /* gray-800 */
+            border-color: #4b5563; /* gray-600 */
+            color: #d1d5db; /* gray-300 */
+        }
+        .form-input:focus, .form-textarea:focus {
+            outline: none;
+            border-color: #3b82f6; /* blue-500 */
+            box-shadow: 0 0 0 2px #1f2937, 0 0 0 4px #3b82f6;
+        }
+        .btn {
+            background-color: #3b82f6; /* blue-500 */
+            transition: background-color 0.2s;
+        }
+        .btn:hover {
+            background-color: #2563eb; /* blue-600 */
+        }
+        .btn:disabled {
+            background-color: #4b5563; /* gray-600 */
+            cursor: not-allowed;
+        }
+        /* Style for the file input button */
+        input[type="file"]::file-selector-button {
+            @apply font-semibold bg-gray-700 text-gray-300 border-0 mr-4 px-4 py-2 rounded-lg cursor-pointer transition-colors duration-200;
+        }
+        input[type="file"]::file-selector-button:hover {
+             @apply bg-gray-600;
+        }
+        /* Style for the auto-resizing textarea */
+        .form-textarea {
+            resize: none;
+            overflow: hidden;
+            min-height: 8rem; /* Start at a smaller height */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-300 flex items-center justify-center min-h-full p-4">
+
+    <div class="w-full max-w-2xl mx-auto">
+        <div class="bg-gray-800 shadow-2xl rounded-2xl p-6 md:p-8">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-white">Airway Route Extractor</h1>
+                <p class="text-gray-400 mt-2">Load your airway data file and enter a route to see the fixes.</p>
+            </div>
+
+            <!-- Step 1: File Upload -->
+            <div class="mb-6">
+                <label for="csvFile" class="block mb-2 text-sm font-medium text-gray-300">1. Load Airway Data</label>
+                <input type="file" id="csvFile" accept=".csv" class="block w-full text-sm text-gray-400 file:rounded-lg file:border-0 file:bg-gray-700 file:px-4 file:py-2 file:font-semibold file:text-gray-300 hover:file:bg-gray-600 transition-colors duration-200 rounded-lg border border-gray-600 cursor-pointer">
+            </div>
+            
+            <!-- Status Message Area -->
+            <div id="status" class="text-center text-sm min-h-[20px] mb-6 text-yellow-400 transition-all duration-300"></div>
+
+            <!-- Step 2: Route Input -->
+            <div class="mb-6">
+                <label for="routeInput" class="block mb-2 text-sm font-medium text-gray-300">2. Enter Route String</label>
+                <input type="text" id="routeInput" placeholder="e.g., ..AGARD.T287.DONIL.." class="form-input w-full p-3 rounded-lg border transition-all duration-200 focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <!-- Process Button -->
+            <div class="mb-6">
+                <button id="processBtn" disabled class="btn w-full text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:shadow-outline">
+                    Process Route
+                </button>
+            </div>
+            
+            <!-- Step 3: Output -->
+            <div>
+                <div class="flex justify-between items-center mb-2">
+                    <label for="outputText" class="block text-sm font-medium text-gray-300">3. Resulting Fixes</label>
+                    <button id="copyBtn" title="Copy to Clipboard" class="text-gray-400 hover:text-white transition-colors duration-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path>
+                          <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path>
+                        </svg>
+                    </button>
+                </div>
+                <textarea id="outputText" readonly class="form-textarea w-full p-3 rounded-lg border transition-all duration-200 focus:ring-2 focus:ring-blue-500" placeholder="Fixes will appear here..."></textarea>
+            </div>
+        </div>
+        <footer class="text-center mt-6 text-gray-500 text-xs">
+            <p>Designed to run locally in your browser. No data is uploaded. </p>
+            <p>Get updated data from <a href='https://www.faa.gov/air_traffic/flight_info/aeronav/aero_data/NASR_Subscription/'>Here </p>
+        </footer>
+    </div>
+
+    <script>
+        // --- Globals ---
+        let airwayData = null; // This will hold the parsed Map of airway data
+
+        // --- DOM Element References ---
+        const fileInput = document.getElementById('csvFile');
+        const routeInput = document.getElementById('routeInput');
+        const processBtn = document.getElementById('processBtn');
+        const statusEl = document.getElementById('status');
+        const outputTextarea = document.getElementById('outputText');
+        const copyBtn = document.getElementById('copyBtn');
+
+        /**
+         * Checks if a given string matches the typical format of an airway identifier.
+         * @param {string} s The string to check.
+         * @returns {boolean} True if it's likely an airway.
+         */
+        function isAirway(s) {
+            if (!s) return false;
+            return /^[A-Z][A-Z0-9]*\d+$/.test(s) || /^[A-Z]\d+$/.test(s);
+        }
+
+        /**
+         * Parses the raw text content of the AWY_BASE.csv file.
+         * @param {string} csvContent The raw string from the CSV file.
+         * @returns {Map<string, string[]>} A map of the parsed airway data.
+         */
+        function parseCSV(csvContent) {
+            const data = new Map();
+            const rows = csvContent.split('\n').slice(1);
+            rows.forEach(row => {
+                if (row.trim() === '') return;
+                const columns = row.split(',').map(field => field.trim().replace(/"/g, ''));
+                if (columns.length >= 8) {
+                    const airwayId = columns[4];
+                    const airwayString = columns[7];
+                    if (airwayId && airwayString) {
+                        // Use regex to split on any whitespace and trim each fix individually
+                        const fixes = airwayString.split(/\s+/)
+                                          .map(fix => fix.trim())
+                                          .filter(fix => fix);
+                        
+                        // Handle multiple entries for same airway ID by combining fixes
+                        if (data.has(airwayId)) {
+                            const existingFixes = data.get(airwayId);
+                            // Combine fixes, avoiding duplicates
+                            const combinedFixes = [...new Set([...existingFixes, ...fixes])];
+                            data.set(airwayId, combinedFixes);
+                        } else {
+                            data.set(airwayId, fixes);
+                        }
+                    }
+                }
+            });
+            return data;
+        }
+
+        /**
+         * Handles the successful loading of CSV data, either from fetch or file upload.
+         * @param {string} csvContent The raw string content of the CSV data.
+         */
+        function handleSuccessfulLoad(csvContent) {
+            try {
+                airwayData = parseCSV(csvContent);
+                processBtn.disabled = false;
+                statusEl.textContent = `AWY_BASE.csv loaded with ${airwayData.size} airways. Ready to process.`;
+                statusEl.className = 'text-center text-sm min-h-[20px] mb-6 text-green-400 transition-all duration-300';
+                routeInput.focus();
+            } catch (error) {
+                statusEl.textContent = 'Error: Could not parse the provided CSV data.';
+                statusEl.className = 'text-center text-sm min-h-[20px] mb-6 text-red-400 transition-all duration-300';
+                console.error("CSV Parsing Error:", error);
+            }
+        }
+
+        /**
+         * Automatically resizes a textarea to fit its content.
+         */
+        function resizeOutputTextarea() {
+            outputTextarea.style.height = 'auto'; // Reset height to shrink if needed
+            outputTextarea.style.height = (outputTextarea.scrollHeight + 2) + 'px';
+        }
+
+        /**
+         * Processes the user-provided route string using the parsed airway data.
+         */
+        function processRoute() {
+            if (!airwayData) {
+                statusEl.textContent = 'Error: Please load the AWY_BASE.csv file first.';
+                statusEl.className = 'text-center text-sm min-h-[20px] mb-6 text-red-400 transition-all duration-300';
+                return;
+            }
+
+            const routeStr = routeInput.value.trim().toUpperCase();
+            outputTextarea.value = '';
+            statusEl.textContent = '';
+
+            if (!routeStr) {
+                resizeOutputTextarea();
+                return;
+            }
+
+            const routeParts = routeStr.split('.').filter(part => part.length > 0);
+            if (routeParts.length === 0) return;
+
+            const finalRoute = [];
+            const errors = [];
+            let i = 0;
+
+            // Start the route with the first fix.
+            if (isAirway(routeParts[0])) {
+                errors.push(`Error: Route cannot start with an airway (${routeParts[0]}).`);
+            } else {
+                finalRoute.push(routeParts[0]);
+                i = 1;
+            }
+
+            // Use a while loop to consume route parts.
+            while (i < routeParts.length) {
+                const currentPart = routeParts[i];
+                const lastFixInRoute = finalRoute[finalRoute.length - 1];
+
+                if (isAirway(currentPart)) {
+                    const airwayId = currentPart;
+                    const exitFix = routeParts[i + 1];
+
+                    if (!exitFix || isAirway(exitFix)) {
+                        errors.push(`Error: Airway ${airwayId} is missing a valid exit fix.`);
+                        i += 1; // Skip the airway
+                        continue;
+                    }
+
+                    if (!airwayData.has(airwayId)) {
+                        errors.push(`Error: Airway ${airwayId} not found in database.`);
+                        i += 2; // Skip airway and exit fix
+                        continue;
+                    }
+
+                    const airwayFixes = airwayData.get(airwayId);
+                    const entryIndex = airwayFixes.indexOf(lastFixInRoute);
+                    const exitIndex = airwayFixes.indexOf(exitFix);
+
+                    if (entryIndex === -1) {
+                        errors.push(`Error: Entry fix ${lastFixInRoute} not found on airway ${airwayId}.`);
+                        i += 2;
+                        continue;
+                    }
+                    if (exitIndex === -1) {
+                        errors.push(`Error: Exit fix ${exitFix} not found on airway ${airwayId}.`);
+                        i += 2;
+                        continue;
+                    }
+
+                    let segmentFixes;
+                    if (entryIndex <= exitIndex) {
+                        segmentFixes = airwayFixes.slice(entryIndex, exitIndex + 1);
+                    } else {
+                        segmentFixes = airwayFixes.slice(exitIndex, entryIndex + 1).reverse();
+                    }
+                    
+                    // Remove entry fix (already in finalRoute) and add the rest.
+                    segmentFixes.shift();
+                    finalRoute.push(...segmentFixes);
+                    i += 2; // Consume airway and exit fix.
+                } else {
+                    // It's a direct-to fix.
+                    if (lastFixInRoute !== currentPart) {
+                        finalRoute.push(currentPart);
+                    }
+                    i += 1;
+                }
+            }
+
+            outputTextarea.value = finalRoute.join('\n');
+            resizeOutputTextarea();
+
+            if (errors.length > 0) {
+                statusEl.textContent = errors.join(' ');
+                statusEl.className = 'text-center text-sm min-h-[20px] mb-6 text-red-400 transition-all duration-300';
+            } else {
+                statusEl.textContent = 'Route processed successfully.';
+                statusEl.className = 'text-center text-sm min-h-[20px] mb-6 text-green-400 transition-all duration-300';
+            }
+        }
+        
+        // --- Event Listeners and Initial Load ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            statusEl.textContent = 'Attempting to load AWY_BASE.csv automatically...';
+            try {
+                const response = await fetch('AWY_BASE.csv');
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const csvContent = await response.text();
+                handleSuccessfulLoad(csvContent);
+            } catch (error) {
+                statusEl.textContent = 'Auto-load failed. Please upload AWY_BASE.csv manually.';
+                statusEl.className = 'text-center text-sm min-h-[20px] mb-6 text-red-400 transition-all duration-300';
+                console.warn("Auto-load failed:", error);
+            }
+        });
+
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => handleSuccessfulLoad(e.target.result);
+            reader.onerror = () => {
+                statusEl.textContent = 'Error: Could not read the selected file.';
+                statusEl.className = 'text-center text-sm min-h-[20px] mb-6 text-red-400 transition-all duration-300';
+            };
+            reader.readAsText(file);
+        });
+
+        processBtn.addEventListener('click', processRoute);
+        
+        routeInput.addEventListener('keyup', (event) => {
+            if (event.key === 'Enter' && !processBtn.disabled) processRoute();
+        });
+
+        routeInput.addEventListener('focus', (event) => event.target.select());
+
+        copyBtn.addEventListener('click', () => {
+            if (!outputTextarea.value) return;
+            outputTextarea.select();
+            outputTextarea.setSelectionRange(0, 99999);
+            try {
+                document.execCommand('copy');
+                copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>`;
+                setTimeout(() => {
+                     copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path></svg>`;
+                }, 1500);
+            } catch (err) {
+                console.error('Fallback: Oops, unable to copy', err);
+            }
+            window.getSelection().removeAllRanges();
+        });
+    </script>
+</body>
+</html>
