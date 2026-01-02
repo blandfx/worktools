@@ -1,0 +1,227 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ATC Route Filter</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background-color: #1a1a1a;
+      color: #e0e0e0;
+      line-height: 1.6;
+      padding: 20px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 30px;
+      background-color: #242424;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    h1 {
+      color: #ffffff;
+      margin-bottom: 30px;
+      text-align: center;
+      font-size: 2em;
+      font-weight: 600;
+    }
+
+    .form-group {
+      margin-bottom: 25px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #d0d0d0;
+      font-weight: 500;
+      font-size: 0.95em;
+    }
+
+    textarea {
+      width: 70%;
+      padding: 12px;
+      background-color: #2a2a2a;
+      color: #e0e0e0;
+      border: 1px solid #404040;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      resize: vertical;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: #5a9;
+      box-shadow: 0 0 0 3px rgba(85, 170, 153, 0.1);
+    }
+
+    textarea[readonly] {
+      background-color: #1f1f1f;
+      cursor: default;
+    }
+
+    textarea[readonly]:focus {
+      border-color: #404040;
+      box-shadow: none;
+    }
+
+    #filterItems {
+      height: 80px;
+      min-height: 80px;
+    }
+
+    #routes {
+      height: 250px;
+      min-height: 250px;
+    }
+
+    #filteredResults {
+      height: 250px;
+      min-height: 250px;
+    }
+
+    .result-count {
+      margin-top: 8px;
+      font-size: 0.85em;
+      color: #999;
+      font-style: italic;
+    }
+
+    ::placeholder {
+      color: #666;
+      opacity: 1;
+    }
+
+    ::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #1a1a1a;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #404040;
+      border-radius: 5px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #505050;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>ATC Route Filter</h1>
+    
+    <div class="form-group">
+      <label for="filterItems">Filter Items (space-separated)</label>
+      <textarea 
+        id="filterItems" 
+        placeholder="Enter filter items separated by spaces (e.g., ABC DEF GHI)"
+        rows="3"
+      ></textarea>
+    </div>
+    
+    <div class="form-group">
+      <label for="routes">ATC Routes (one per line)</label>
+      <textarea 
+        id="routes" 
+        placeholder="Enter ATC routes, one per line&#10;Example:&#10;ABC123 DEF456&#10;GHI789 JKL012"
+        rows="12"
+      ></textarea>
+    </div>
+    
+    <div class="form-group">
+      <label for="filteredResults">Filtered Routes</label>
+      <textarea 
+        id="filteredResults" 
+        readonly
+        rows="12"
+        placeholder="Filtered results will appear here..."
+      ></textarea>
+      <div class="result-count" id="resultCount"></div>
+    </div>
+  </div>
+  
+  <script>
+    const filterItemsInput = document.getElementById('filterItems');
+    const routesInput = document.getElementById('routes');
+    const filteredResultsOutput = document.getElementById('filteredResults');
+    const resultCountDisplay = document.getElementById('resultCount');
+
+    function filterRoutes() {
+      // Get filter items and routes
+      const filterItemsText = filterItemsInput.value.trim();
+      const routesText = routesInput.value.trim();
+
+      // Split filter items by spaces and filter out empty strings
+      const filterItems = filterItemsText
+        ? filterItemsText.split(/\s+/).filter(item => item.length > 0)
+        : [];
+
+      // Split routes by newlines and filter out empty strings
+      const routes = routesText
+        ? routesText.split('\n').map(route => route.trim()).filter(route => route.length > 0)
+        : [];
+
+      let filteredRoutes = [];
+
+      // If no filter items, show all routes
+      if (filterItems.length === 0) {
+        filteredRoutes = routes;
+      } else {
+        // Filter routes: include route if it contains ANY filter item (case-insensitive)
+        filteredRoutes = routes.filter(route => {
+          const routeLower = route.toLowerCase();
+          return filterItems.some(item => {
+            const itemLower = item.toLowerCase();
+            return routeLower.includes(itemLower);
+          });
+        });
+      }
+
+      // Update filtered results
+      filteredResultsOutput.value = filteredRoutes.join('\n');
+
+      // Update result count
+      const count = filteredRoutes.length;
+      const total = routes.length;
+      if (total > 0) {
+        resultCountDisplay.textContent = `Showing ${count} of ${total} route${total !== 1 ? 's' : ''}`;
+      } else {
+        resultCountDisplay.textContent = '';
+      }
+    }
+
+    // Attach event listeners for real-time filtering
+    filterItemsInput.addEventListener('input', filterRoutes);
+    filterItemsInput.addEventListener('paste', () => {
+      setTimeout(filterRoutes, 10);
+    });
+
+    routesInput.addEventListener('input', filterRoutes);
+    routesInput.addEventListener('paste', () => {
+      setTimeout(filterRoutes, 10);
+    });
+
+    // Initial filter on page load
+    filterRoutes();
+  </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"6247cc1006f24529aaed02d8c5cba0a2","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
